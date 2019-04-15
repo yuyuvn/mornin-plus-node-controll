@@ -1,0 +1,11 @@
+{
+  "name": "mornin-plus-node-controll",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/yuyuvn/mornin-plus-node-controll.git",
+  "author": "Clicia Scarlet <yuyuvn@mac.com>",
+  "license": "MIT",
+  "dependencies": {
+    "noble": "^1.9.1"
+  }
+}
