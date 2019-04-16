@@ -6,28 +6,16 @@ const jsonParser = bodyParser.json()
 const Chicken = require('./morninAPI/gatt');
 
 let chicken;
-let connections = 0;
 
 SUPPORTED_COMMANDS = ['open', 'close', 'stop', 'hightSpeedOpen', 'hightSpeedClose']
 
 async function connect(token) {
-  if (chiecken) {
-    connections += 1;
-    return;
-  }
-
   chicken = new Chicken(token);
-  return chicken.connect();
-}
-
-function disconnect() {
-  if (!chicken) return;
-
-  connections -= 1;
-  if (connections > 0) return;
-
-  chicken.disconnect();
-  chicken = null;
+  try {
+    return chicken.connect();
+  } catch (err) {
+    if (!(err instanceof UnhandledPromiseRejectionWarning)) throw err;
+  }
 }
 
 SUPPORTED_COMMANDS.forEach((command) => {
@@ -43,7 +31,6 @@ SUPPORTED_COMMANDS.forEach((command) => {
       console.error(e)
       res.send(e)
     }
-    disconnect();
   })
 })
 

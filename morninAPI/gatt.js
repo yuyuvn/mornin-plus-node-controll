@@ -80,7 +80,7 @@ async function handleConnect(err) {
       }
 
       services.forEach(function(service) {
-        console.log('found service:', service.uuid);
+        // console.log('found service:', service.uuid);
         service.discoverCharacteristics([], handleDiscoverCharacteristics)
       })
 
@@ -92,7 +92,7 @@ async function handleConnect(err) {
 async function handleDiscoverCharacteristics(err, characteristics) {
   return new Promise((resolve) => {
     characteristics.forEach(function(characteristic) {
-      console.log('found characteristic:', characteristic.uuid);
+      // console.log('found characteristic:', characteristic.uuid);
   
       if (AppServiceStatusUuid == characteristic.uuid) {
         appServiceStatusCharacteristic = characteristic;
