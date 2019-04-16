@@ -1,5 +1,5 @@
 # mornin-plus-node-controll
-Node controll mornin' plus
+Node control mornin' plus
 
 # TODO
 ## Write mornin' plus service
