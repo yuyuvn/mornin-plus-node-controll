@@ -143,6 +143,11 @@ async function auth() {
 
 async function act(command) {
   return new Promise((resolve, reject) => {
+    if (!connected) {
+      reject("Not connected");
+      return;
+    }
+
     controlServiceControlCharacteristic.write(command, true, (err) => {
       if (err) {
         reject(err);

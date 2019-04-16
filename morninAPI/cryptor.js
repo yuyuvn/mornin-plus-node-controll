@@ -2,12 +2,6 @@ const crypto = require('crypto');
 
 const CMD_VALIDATE_ENCRYPTED_MAIN_TOKEN = Buffer.from([0x02])
 
-module.export = function getToken(key, authSeed) {
-  const encryptedToken = encryptMain(string2Buffer(key), authSeed);
-
-  return new Buffer.concat([CMD_VALIDATE_ENCRYPTED_MAIN_TOKEN, encryptedToken])
-}
-
 function string2Buffer(string) {
   return Buffer.from(string, 'hex');
 }
@@ -25,4 +19,10 @@ function encryptWithKeyAndToken(key, mainToken) {
   const cipher = crypto.createCipheriv('aes-128-ecb', key, '');
   cipher.setAutoPadding(false);
   return Buffer.concat([cipher.update(mainToken), cipher.final()]);
+}
+
+module.exports = function (key, authSeed) {
+  const encryptedToken = encryptMain(string2Buffer(key), authSeed);
+
+  return new Buffer.concat([CMD_VALIDATE_ENCRYPTED_MAIN_TOKEN, encryptedToken])
 }
