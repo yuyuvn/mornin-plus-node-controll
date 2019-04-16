@@ -6,6 +6,10 @@
   "author": "Clicia Scarlet <yuyuvn@mac.com>",
   "license": "MIT",
   "dependencies": {
+    "crypto": "^1.0.1",
     "noble": "^1.9.1"
+  },
+  "devDependencies": {
+    "mocha": "^6.1.3"
   }
 }
