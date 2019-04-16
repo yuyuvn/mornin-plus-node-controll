@@ -148,7 +148,7 @@ async function act(command) {
       return;
     }
 
-    controlServiceControlCharacteristic.write(command, true, (err) => {
+    controlServiceControlCharacteristic.write(command, false, (err) => {
       if (err) {
         reject(err);
         return;
