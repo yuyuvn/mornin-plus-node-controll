@@ -22,6 +22,8 @@ let controlSettingSettingCharacteristic = null;
 let peripheral = null;
 let connected = false;
 
+let mainKey = null;
+
 noble.on('stateChange', function(state) {
   if (state === 'poweredOn') {
     console.log('scanning...');
@@ -40,7 +42,7 @@ noble.on('discover', function(discovered_peripheral) {
   console.log('found peripheral:', peripheral.advertisement);
 })
 
-async function connect() {
+async function connectPeripheral() {
   if (!peripheral) throw "Peripheral not found"
   await peripheral.connect(handleConnect);
 
@@ -50,7 +52,7 @@ async function connect() {
       if (checker) {
         clearInterval(checker);
       }
-      disconnect();
+      disconnectPeripheral();
       reject("Timeout!");
     }, 60000);
 
@@ -128,7 +130,7 @@ async function auth() {
         return;
       }
       const token = data.slice(11, 15);
-      const encodedKey = getToken('197657223841bce26def52bc7d78d092', token);
+      const encodedKey = getToken(mainKey, token);
       appServiceStatusCharacteristic.write(encodedKey, false, (err) => {
         if (!err) {
           connected = true;
@@ -159,7 +161,7 @@ async function act(command) {
   })
 }
 
-async function disconnect() {
+async function disconnectPeripheral() {
   return new Promise((resolve, reject) => {
     if (!peripheral) {
       reject("Not connected");
@@ -186,14 +188,36 @@ function reset() {
   connected = false;
 }
 
-module.exports = {
-  open: async () => act(OpenCommand),
-  close: async () => act(CloseCommand),
-  stop: async () => act(StopCommand),
+module.exports = class {
+  constructor(key) {
+    mainKey = key;
+  }
 
-  hightSpeedOpen: async () => act(HightSpeedOpenCommand),
-  hightSpeedClose: async () => act(HightSpeedCloseCommand),
+  async open(){
+    act(OpenCommand);
+  }
+  
+  async close(){
+    act(CloseCommand);
+  } 
 
-  disconnect: disconnect,
-  connect: connect
+  async stop(){
+    act(StopCommand);
+  }
+
+  async hightSpeedOpen(){
+    act(HightSpeedOpenCommand);
+  }
+
+  async hightSpeedClose(){
+    act(HightSpeedCloseCommand);
+  }
+
+  async connect() {
+    return connectPeripheral();
+  }
+
+  disconnect() {
+    return disconnectPeripheral();
+  }
 }

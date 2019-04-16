@@ -3,9 +3,9 @@ Node control mornin' plus
 
 # TODO
 ## Write mornin' plus service
-- [ ] Crytor
-- [ ] Service
+- [x] Crytor
+- [x] Service
 - [ ] Support multidevices
 ## Write api server
-- [ ] act now service
+- [x] web service
 - [ ] metrics
