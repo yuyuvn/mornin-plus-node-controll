@@ -118,13 +118,13 @@ async function handleDiscoverCharacteristics(err, characteristics) {
 
 async function auth() {
   return new Promise((resolve, reject) => {
-    const data = await appServiceStatusCharacteristic.read(function(error, data) {
+    appServiceStatusCharacteristic.read(function(error, data) {
       if (error) {
         reject(error);
         return;
       }
       if (data.length != 19) {
-        reject("Data is corrupted: ", data.toString())
+        reject("Data is corrupted: ", data.toString('hex'))
         return;
       }
       const token = data.slice(11, 15);
