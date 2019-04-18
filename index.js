@@ -11,17 +11,11 @@ chicken = new Chicken(process.env.CHICKEN_TOKEN);
 SUPPORTED_COMMANDS = ['open', 'close', 'stop', 'hightSpeedOpen', 'hightSpeedClose', 'disconnect']
 
 async function connect() {
-  if (chicken.connectedPeripheral && chicken.connectedPeripheral.state == 'connected') {
-    return;
+  try {
+    return chicken.connect();
+  } catch (err) {
+    if (!(err instanceof UnhandledPromiseRejectionWarning)) throw err;
   }
-
-  await chicken.connect();
-}
-
-async function wait(timeNs) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, timeNs)
-  })
 }
 
 SUPPORTED_COMMANDS.forEach((command) => {
