@@ -3,7 +3,7 @@ Node control mornin' plus
 
 # Usage
 ## Get token
-### get from android log via abd
+### Get token from android log via abd
 1. Download adb from https://developer.android.com/studio/releases/platform-tools.html
 
 2. Run logcat
