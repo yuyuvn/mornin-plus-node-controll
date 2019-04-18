@@ -7,6 +7,8 @@
   "license": "MIT",
   "dependencies": {
     "crypto": "^1.0.1",
+    "express": "^4.16.4",
+    "metrics": "^0.1.21",
     "noble": "^1.9.1"
   },
   "devDependencies": {

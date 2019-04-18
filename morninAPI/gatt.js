@@ -20,6 +20,7 @@ let appBatteryCharacteristic = null;
 let controlServiceControlCharacteristic = null;
 let controlSettingSettingCharacteristic = null;
 let peripheral = null;
+let connectedWithoutAuth = false;
 let connected = false;
 
 let mainKey = null;
@@ -38,6 +39,9 @@ noble.on('stateChange', function(state) {
 noble.on('discover', function(discovered_peripheral) {
   noble.stopScanning();
   peripheral = discovered_peripheral;
+  peripheral.once('disconnect', () => {
+    reset()
+  })
 
   console.log('found peripheral:', peripheral.advertisement);
 })
@@ -57,7 +61,7 @@ async function connectPeripheral() {
     }, 60000);
 
     checker = setInterval(() => {
-      if (connected) {
+      if (connected || connectedWithoutAuth) {
         clearTimeout(timeout);
         clearInterval(checker);
         resolve();
@@ -96,7 +100,7 @@ async function handleDiscoverCharacteristics(err, characteristics) {
   
       if (AppServiceStatusUuid == characteristic.uuid) {
         appServiceStatusCharacteristic = characteristic;
-        auth();
+        if (mainKey) auth();
       }
       else if (AppBatteryStatusUuid == characteristic.uuid) {
         appBatteryCharacteristic = characteristic;
@@ -113,6 +117,7 @@ async function handleDiscoverCharacteristics(err, characteristics) {
       appBatteryCharacteristic &&
       controlServiceControlCharacteristic &&
       controlSettingSettingCharacteristic) {
+      if (!mainKey) connectedWithoutAuth = true;
       resolve();
     }
   })
@@ -120,7 +125,7 @@ async function handleDiscoverCharacteristics(err, characteristics) {
 
 async function auth() {
   return new Promise((resolve, reject) => {
-    appServiceStatusCharacteristic.read(function(error, data) {
+    appServiceStatusCharacteristic.read((error, data) => {
       if (error) {
         reject(error);
         return;
@@ -161,6 +166,37 @@ async function act(command) {
   })
 }
 
+async function readBatteryStatus() {
+  return new Promise((resolve, reject) => {
+    if (!appBatteryCharacteristic) {
+      reject("Not connected");
+      return;
+    }
+
+    appBatteryCharacteristic.read((error, data) => {
+      if (error) {
+        reject(error);
+        return;
+      }      
+      if (data.length != 2) {
+        reject("Data is corrupted: ", data.toString('hex'))
+        return;
+      }
+
+      resolve(batteryLevel(batteryVolt(data)))
+    })
+  })
+}
+
+function batteryVolt(data) {
+  const volt = data.readInt16LE(0);
+  return volt * 0.005315803;
+}
+
+function batteryLevel(data) {
+  return Math.max(Math.ceil(((data - 3.3) / 1.2) * 100.0), 0);
+}
+
 async function disconnectPeripheral() {
   return new Promise((resolve, reject) => {
     if (!peripheral) {
@@ -185,39 +221,53 @@ function reset() {
   appBatteryCharacteristic = null;
   controlServiceControlCharacteristic = null;
   controlSettingSettingCharacteristic = null;
+  connectedWithoutAuth = false;
   connected = false;
+  peripheral = null;
 }
 
 module.exports = class {
   constructor(key) {
-    mainKey = key;
+    if (key) mainKey = key;
   }
 
   async open(){
-    act(OpenCommand);
+    await act(OpenCommand);
   }
   
   async close(){
-    act(CloseCommand);
+    await act(CloseCommand);
   } 
 
   async stop(){
-    act(StopCommand);
+    await act(StopCommand);
   }
 
   async hightSpeedOpen(){
-    act(HightSpeedOpenCommand);
+    await act(HightSpeedOpenCommand);
   }
 
   async hightSpeedClose(){
-    act(HightSpeedCloseCommand);
+    await act(HightSpeedCloseCommand);
+  }
+
+  async battery(){
+    return readBatteryStatus()
   }
 
   async connect() {
-    return connectPeripheral();
+    await connectPeripheral();
   }
 
-  disconnect() {
-    return disconnectPeripheral();
+  async disconnect() {
+    await disconnectPeripheral();
+  }
+
+  startScan() {
+    noble.startScanning([AppServiceUuid], false);
+  }
+
+  get connectedPeripheral() {
+    return peripheral;
   }
 }
