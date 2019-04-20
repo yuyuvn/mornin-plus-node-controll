@@ -12,10 +12,36 @@ SUPPORTED_COMMANDS = ['open', 'close', 'stop', 'hightSpeedOpen', 'hightSpeedClos
 
 async function connect() {
   try {
-    return chicken.connect();
+    return await chicken.connect();
   } catch (err) {
+    if (err.match(/Peripheral not found/)) {
+      await chicken.disconnect();
+      await chicken.startScan();
+      await waitUntil(() => chicken.connectedPeripheral, 60000);
+      return await chicken.connect();
+    }
     if (!(err instanceof UnhandledPromiseRejectionWarning)) throw err;
   }
+}
+
+async function waitUntil(condition, timeout) {
+  let checker;
+  let timeoutChecker;
+  if (condition()) return;
+
+  return new Promise((resolve, reject) => {
+    checker = setInterval(() => {
+      if (!condition()) return;
+
+      clearTimeout(timeoutChecker);
+      resolve();
+    }, 100)
+
+    timeoutChecker = setTimeout(() => {
+      clearInterval(checker);
+      reject("Timeout!")
+    }, timeout)
+  });  
 }
 
 SUPPORTED_COMMANDS.forEach((command) => {
