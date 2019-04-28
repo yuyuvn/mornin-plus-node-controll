@@ -34,6 +34,7 @@ async function waitUntil(condition, timeout) {
       if (!condition()) return;
 
       clearTimeout(timeoutChecker);
+      clearInterval(checker);
       resolve();
     }, 100)
 
