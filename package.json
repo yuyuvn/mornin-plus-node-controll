@@ -7,6 +7,6 @@
   "license": "MIT",
   "dependencies": {
     "express": "^4.17.1",
-    "noble": "^1.9.1"
+    "node-ble": "^1.4.0"
   }
 }

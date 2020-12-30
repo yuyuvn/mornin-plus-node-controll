@@ -5,7 +5,7 @@ const bodyParser = require('body-parser')
 const jsonParser = bodyParser.json()
 const Chicken = require('./morninAPI/gatt_v2');
 
-let chicken = new Chicken(process.env.CHICKEN_TOKEN);
+let chicken = new Chicken(process.env.CHICKEN_TOKEN, "D3:65:2E:21:06:28");
 
 SUPPORTED_COMMANDS = ['open', 'close', 'stop', 'hightSpeedOpen', 'hightSpeedClose']
 

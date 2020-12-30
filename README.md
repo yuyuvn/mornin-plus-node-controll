@@ -65,13 +65,10 @@ docker rm -f dummy
 
 # Docker build
 ```bash
-docker buildx create --use --name mornin
-docker buildx build . --platform linux/amd64,linux/arm64,linux/arm/v7 -t clicia/mornin:latest
-docker buildx rm mornin
+make build
 ```
 
 # Run docker
 ```bash
-killall -9 bluetoothd
-docker run --net=host --privileged -p 5322 -e CHICKEN_TOKEN=TOKEN clicia/mornin:latest
+docker run -d --net=host --privileged -e CHICKEN_TOKEN=TOKEN clicia/mornin:latest
 ```

@@ -1,12 +1,12 @@
-const noble = require('noble');
+const {createBluetooth} = require('node-ble');
 const getToken = require('./cryptor');
 
-const AppServiceUuid = '79ab00009dfa4ae2bd46ac69d9fdd743';
-const AppServiceStatusUuid = '79ab00019dfa4ae2bd46ac69d9fdd743';
-const AppBatteryStatusUuid = '79ab00029dfa4ae2bd46ac69d9fdd743';
-const ControlServiceUuid = '79ab10009dfa4ae2bd46ac69d9fdd743';
-const ControlServiceControlUuid = '79ab10019dfa4ae2bd46ac69d9fdd743';
-const ControlSettingSettingUuid = '79ab10029dfa4ae2bd46ac69d9fdd743';
+const AppServiceUuid            = '79ab0000-9dfa-4ae2-bd46-ac69d9fdd743';
+const AppServiceStatusUuid      = '79ab0001-9dfa-4ae2-bd46-ac69d9fdd743';
+const AppBatteryStatusUuid      = '79ab0002-9dfa-4ae2-bd46-ac69d9fdd743';
+const ControlServiceUuid        = '79ab1000-9dfa-4ae2-bd46-ac69d9fdd743';
+const ControlServiceControlUuid = '79ab1001-9dfa-4ae2-bd46-ac69d9fdd743';
+const ControlSettingSettingUuid = '79ab1002-9dfa-4ae2-bd46-ac69d9fdd743';
 
 const OpenCommand = Buffer.from([0, 0])
 const CloseCommand = Buffer.from([0, 1])
@@ -14,172 +14,102 @@ const StopCommand = Buffer.from([0, 2])
 
 const HightSpeedOpenCommand = Buffer.from([3, 0])
 const HightSpeedCloseCommand = Buffer.from([3, 1])
-
-let appServiceStatusCharacteristic = null;
-let appBatteryCharacteristic = null;
-let controlServiceControlCharacteristic = null;
-let controlSettingSettingCharacteristic = null;
 let mainKey = null;
+let deviceMacAddress = null;
 
-let logedin = false;
-let state = "idle"; // idle -> ready -> scanning -> discovered -> connecting -> connected -> disconnecting
-let peripheral = null;
+let state = "ready"; // ready -> connecting -> connected -> disconnecting
+let device = null;
+let sessionTimeout = null;
 
-noble.on("stateChange", function(bleState) {
-  if (bleState === "poweredOn") {
-    state = "ready"
-  } else {
-    resetState();
-    noble.stopScanning();
-    state = "idle"
-  }
-})
+let sessionBluetooth;
+let sessionDestroy;
+
+const DEBUG = process.env.DEBUG;
 
 async function scan() {
   if (state == "ready") {
-    noble.startScanning([AppServiceUuid], false);
-    state = "scanning";
+    let {bluetooth, destroy} = createBluetooth();
+    sessionBluetooth = bluetooth
+    sessionDestroy = destroy
 
-    try {
-      await waitFor(300, () => state != "scanning");
-    } catch {
-      console.error("Peripheral not found!");
-      resetState();
+    const adapter = await retry(5, async () => await bluetooth.defaultAdapter());
+
+    if (DEBUG) console.debug("Get adapter completed")
+
+    if (! await adapter.isPowered()) {
+      throw "Adapter is not working"
     }
-  }
-}
 
-noble.on('discover', function(discovered_peripheral) {
-  noble.stopScanning(); // only support 1 decive
-  peripheral = discovered_peripheral;
-  peripheral.once('disconnect', () => {
-    resetState();
-  });
-  console.log('Found peripheral:', peripheral.advertisement);
+    state = "connecting"
 
-  state = "discovered";
-  connect();
-})
-
-async function connect() {
-  if (state == "discovered") {
-    state = "connecting";
-    peripheral.connect((err) => handleConnect(err, peripheral));
-
-    try {
-      await waitFor(300, () => state != "connecting");
-    } catch {
-      console.error("Can't connect!");
-      resetState();
-    }
-  }
-}
-
-async function handleConnect(err) {
-  if (err) throw err;
-
-  peripheral.discoverServices([AppServiceUuid, ControlServiceUuid], function(err, services) {
-    if (err) throw err;
-
-    services.forEach(function(service) {
-      // console.log('found service:', service.uuid);
-      service.discoverCharacteristics([], handleDiscoverCharacteristics)
-    })
-  })
-}
-
-async function handleDiscoverCharacteristics(err, characteristics) {
-  for (characteristic in characteristics) {
-    if (AppServiceStatusUuid == characteristic.uuid) {
-      appServiceStatusCharacteristic = characteristic;
-      await auth(mainKey);
-      logedin = true;
-    }
-    else if (AppBatteryStatusUuid == characteristic.uuid) {
-      appBatteryCharacteristic = characteristic;
-    }
-    else if (ControlServiceControlUuid == characteristic.uuid) {
-      controlServiceControlCharacteristic = characteristic;
-    }
-    else if (ControlSettingSettingUuid == characteristic.uuid) {
-      controlSettingSettingCharacteristic = characteristic;
-    }
-  }
-
-  if (appServiceStatusCharacteristic && logedin &&
-    appBatteryCharacteristic &&
-    controlServiceControlCharacteristic &&
-    controlSettingSettingCharacteristic) {
-      state = "connected"
-
-    setTimeout(() => {
-      disconnect()
-    }, 300) // Disconnect after 5 minutes
-  }
-}
-
-async function auth(mainKey) {
-  return new Promise((resolve, reject) => {
-    appServiceStatusCharacteristic.read((error, data) => {
-      if (error) {
-        reject(error);
-        return;
+    if (! await adapter.isDiscovering())
+      await adapter.startDiscovery()
+    else {
+      if (DEBUG) {
+        console.debug("Already discovering...")
       }
-      if (data.length != 19) {
-        reject("Data is corrupted: ", data.toString('hex'))
-        return;
-      }
-      const token = data.slice(11, 15);
-      const encodedKey = getToken(mainKey, token);
-      appServiceStatusCharacteristic.write(encodedKey, false, (err) => {
-        if (!err) {
-          resolve()
-        } else {
-          reject(err)
-        }
-      })
-    })
-  })
+    }
+
+    if (DEBUG) console.debug("Start discovery")
+
+    device = await adapter.waitDevice(deviceMacAddress)
+
+    if (DEBUG) console.debug("Device found!")
+
+    await device.connect()
+
+    console.log("Connected!")
+
+    const gattServer = await device.gatt()
+
+    if (DEBUG) {
+      console.debug("List of services: ", await gattServer.services())
+    }
+
+    await login(gattServer)
+    extendSession()
+    state = "connected"
+  }
+}
+
+async function login(gattServer) {
+  if (DEBUG) {
+    console.debug("Loging in")
+  }
+
+  const service = await gattServer.getPrimaryService(AppServiceUuid)
+  const characteristic = await service.getCharacteristic(AppServiceStatusUuid)
+  const data = await characteristic.readValue()
+  const token = data.slice(11, 15)
+  const encodedKey = getToken(mainKey, token)
+  await characteristic.writeValue(encodedKey)
 }
 
 async function act(command) {
-  return new Promise((resolve, reject) => {
-    if (state != "connected") {
-      reject("Not connected");
-      return;
-    }
+  if (DEBUG) {
+    console.debug("Sending command: ", command)
+  }
 
-    controlServiceControlCharacteristic.write(command, false, (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      resolve()
-    })
-  })
+  extendSession()
+  const gattServer = await device.gatt()
+  const service = await gattServer.getPrimaryService(ControlServiceUuid)
+  const characteristic = await service.getCharacteristic(ControlServiceControlUuid)
+  await characteristic.writeValue(command)
 }
 
 async function readBatteryStatus() {
-  return new Promise((resolve, reject) => {
-    if (state != "connected") {
-      reject("Not connected");
-      return;
-    }
-
-    appBatteryCharacteristic.read((error, data) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      if (data.length != 2) {
-        reject("Data is corrupted: ", data.toString('hex'))
-        return;
-      }
-
-      resolve(batteryLevel(batteryVolt(data)))
-    })
-  })
+  if (DEBUG) {
+    console.debug("Reading battery status")
+  }
+  extendSession()
+  const gattServer = await device.gatt()
+  const service = await gattServer.getPrimaryService(AppServiceUuid)
+  const characteristic = await service.getCharacteristic(AppBatteryStatusUuid)
+  const data = await characteristic.readValue()
+  if (DEBUG) {
+    console.debug("Data received: ", data)
+  }
+  return batteryLevel(batteryVolt(data))
 }
 
 function batteryVolt(data) {
@@ -191,47 +121,56 @@ function batteryLevel(data) {
   return Math.max(Math.ceil(((data - 3.3) / 1.2) * 100.0), 0);
 }
 
-async function disconnect() {
-  if (state != "connected") {
-    reset();
-    return;
+function extendSession() {
+  if (sessionTimeout) {
+    clearTimeout(sessionTimeout)
+    sessionTimeout = null
   }
 
-  state = "disconnecting";
-  return new Promise((resolve) => {
-    peripheral.disconnect(() => {
-      resetState();
-      resolve();
-    })
-  })
+  sessionTimeout = setTimeout(timeout, 120000)
+}
+
+async function timeout() {
+  if (DEBUG) {
+    console.debug("Session Timeout!")
+  }
+
+  await disconnect();
+  sessionTimeout = null;
+}
+
+async function disconnect() {
+  state = "disconnecting"
+  await device.disconnect()
+  sessionDestroy()
+  resetState()
 }
 
 function resetState() {
-  appServiceStatusCharacteristic = null;
-  appBatteryCharacteristic = null;
-  controlServiceControlCharacteristic = null;
-  controlSettingSettingCharacteristic = null;
-  connectedWithoutAuth = false;
   state = "ready";
-  peripheral = null;
-  logedin = false;
+  device = null;
 }
 
 async function waitForConnect() {
-  switch(state) {
-    case "idle":
-    case "disconnecting":
-      await waitFor(60, () => state == "ready");
-    case "ready":
-      await scan();
-    case "scanning":
-    case "discovered":
-    case "connecting":
-      await waitFor(60, () => state == "connected");
-    case "connected":
-      return true;
-    default:
-      throw "Unknow state";
+  if (DEBUG) {
+    console.debug("Current state: ", state)
+  }
+  try {
+    switch(state) {
+      case "disconnecting":
+        await waitFor(60000, () => state == "ready");
+      case "ready":
+        await scan();
+      case "connecting":
+        await waitFor(60000, () => state == "connected");
+      case "connected":
+        return true;
+      default:
+        throw "Unknow state";
+    }
+  } catch (err) {
+    resetState()
+    throw err
   }
 }
 
@@ -252,9 +191,25 @@ async function waitFor(timeout, condition) {
   })
 }
 
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function retry(retries, job) {
+  try {
+    return await job()
+  } catch (err) {
+    if (retries > 0) {
+      await sleep(1000);
+      return retry(retries - 1, job);
+    } else throw err;
+  }
+}
+
 module.exports = class {
-  constructor(key) {
+  constructor(key, macAddress) {
     mainKey = key;
+    deviceMacAddress = macAddress;
   }
 
   async open(){
@@ -284,6 +239,6 @@ module.exports = class {
 
   async battery(){
     await waitForConnect();
-    return readBatteryStatus()
+    return await readBatteryStatus()
   }
 }
