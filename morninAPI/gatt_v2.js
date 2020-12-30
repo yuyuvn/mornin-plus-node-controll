@@ -89,9 +89,7 @@ async function handleConnect(err) {
 }
 
 async function handleDiscoverCharacteristics(err, characteristics) {
-    characteristics.forEach(function(characteristic) {
-    // console.log('found characteristic:', characteristic.uuid);
-
+  for (characteristic in characteristics) {
     if (AppServiceStatusUuid == characteristic.uuid) {
       appServiceStatusCharacteristic = characteristic;
       await auth(mainKey);
@@ -106,7 +104,7 @@ async function handleDiscoverCharacteristics(err, characteristics) {
     else if (ControlSettingSettingUuid == characteristic.uuid) {
       controlSettingSettingCharacteristic = characteristic;
     }
-  })
+  }
 
   if (appServiceStatusCharacteristic && logedin &&
     appBatteryCharacteristic &&
