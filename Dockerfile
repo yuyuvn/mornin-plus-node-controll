@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y bluetooth bluez libbluetooth-dev libude
 RUN groupadd --gid 1000 node \
   && useradd --uid 1000 --gid node --shell /bin/bash --create-home node
 
-ENV NODE_VERSION 14.15.3
+ENV NODE_VERSION 12.20.0
 
 RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
     && case "${dpkgArch##*-}" in \
@@ -95,8 +95,9 @@ RUN set -ex \
 WORKDIR /app
 
 COPY package.json package.json
-COPY yarn.lock yarn.lock
+# COPY yarn.lock yarn.lock
 
+RUN apt-get update && apt-get install -y build-essential
 RUN yarn
 
 ENTRYPOINT ["./entrypoint.sh"]
