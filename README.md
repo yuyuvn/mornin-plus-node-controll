@@ -1,6 +1,11 @@
 # mornin-plus-node-control
 Node control mornin' plus
 
+# Raspbian
+```
+sudo apt-get install bluetooth bluez libbluetooth-dev libudev-dev
+```
+
 # Usage
 ## Get token
 ### Get token from android log via abd
@@ -45,9 +50,28 @@ POST /act/<command> application/json {"token": "YOUR_TOKEN"}
 * stop
 * hightSpeedOpen
 * hightSpeedClose
-* disconnect
 
 # TODO
-- [ ] Refactor state, support rescan
 - [ ] Test code
 - [ ] Support multidevices
+
+# Export yarn.lock
+```bash
+docker build . -t mornin:latest
+docker create -ti --name dummy mornin:latest bash
+docker cp dummy:/app/yarn.lock ./yarn.lock
+docker rm -f dummy
+```
+
+# Docker build
+```bash
+docker buildx create --use --name mornin
+docker buildx build . --platform linux/amd64,linux/arm64,linux/arm/v7 -t clicia/mornin:latest
+docker buildx rm mornin
+```
+
+# Run docker
+```bash
+killall -9 bluetoothd
+docker run --net=host --privileged -p 5322 -e CHICKEN_TOKEN=TOKEN clicia/mornin:latest
+```
