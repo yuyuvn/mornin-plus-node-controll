@@ -21,15 +21,16 @@ let state = "ready"; // ready -> connecting -> connected -> disconnecting
 let device = null;
 let sessionTimeout = null;
 
-let sessionBluetooth;
 let sessionDestroy;
+
+const CONNECT_TIOMEOUT = 2 * 60 * 1000;
+const SESSION_TIOMEOUT = 5 * 60 * 1000;
 
 const DEBUG = process.env.DEBUG;
 
 async function scan() {
   if (state == "ready") {
     let {bluetooth, destroy} = createBluetooth();
-    sessionBluetooth = bluetooth
     sessionDestroy = destroy
 
     const adapter = await retry(5, async () => await bluetooth.defaultAdapter());
@@ -127,7 +128,7 @@ function extendSession() {
     sessionTimeout = null
   }
 
-  sessionTimeout = setTimeout(timeout, 120000)
+  sessionTimeout = setTimeout(timeout, SESSION_TIOMEOUT)
 }
 
 async function timeout() {
@@ -158,11 +159,11 @@ async function waitForConnect() {
   try {
     switch(state) {
       case "disconnecting":
-        await waitFor(60000, () => state == "ready");
+        await waitFor(CONNECT_TIOMEOUT, () => state == "ready");
       case "ready":
         await scan();
       case "connecting":
-        await waitFor(60000, () => state == "connected");
+        await waitFor(CONNECT_TIOMEOUT, () => state == "connected");
       case "connected":
         return true;
       default:
